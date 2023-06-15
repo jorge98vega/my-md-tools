@@ -1,0 +1,28 @@
+# The nanotubes are positioned like:
+# 0 1
+# 3 2
+
+# Files parameters
+pdbfile = "model_building/4t10s_run04.pdb"	# Name of the input pdb file with the system info
+rstfile = "min/4t10s_run04_min_rst.dat"		# Name of the output file with the restraints data
+
+# System parameters
+Ntubes = 4		# Number of nanotubes in the system
+Nrings = 10		# Number of rings in a nanotube
+Nres = 8 		# Number of residues in a ring
+Natoms = 171		# Number of atoms in a ring
+
+# Restraints parameters
+rings = true		# Apply restraints to the ring-ring distance
+tubes = true		# Apply restraints to the tube-tube distance
+tips = false		# Apply restraints to the tip-tip distance
+torsion = true		# Apply restraints to the torsion
+connect1 = [0, 1, 2, 3]	# (The distance between the nanotubes connect1[i] and
+connect2 = [1, 2, 3, 0]	# connect2[i] is restrained)
+ifvari = false		# Varying restraints (false = 0, true = 1)
+nstep1 = 0		# 
+nstep2 = 10000		# 
+r3 = 19.0		# 
+r3a = 20.0 		# 
+rk3 = 200.0		# 
+rk3a = rk3		# 
