@@ -1,0 +1,21 @@
+Remark line goes here
+MASS
+F  19.000        0.320               same as f  
+
+BOND
+CT-F   356.90   1.350       same as c3- f, penalty score=  0.0
+
+ANGLE
+F -CT-F    70.900     107.360   same as f -c3-f , penalty score=  0.0
+C -CT-F    66.300     110.000   same as c -c3-f , penalty score=  0.0
+
+DIHE
+O2-C -CT-F    6    0.000       180.000           2.000      same as X -c -c3-X , penalty score=  0.0
+
+IMPROPER
+
+NONBON
+  F           1.7500  0.0610             same as f  
+
+
+
