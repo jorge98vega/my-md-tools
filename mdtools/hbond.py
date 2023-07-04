@@ -37,7 +37,7 @@ __all__ = ['wernet_nilsson', 'baker_hubbard', 'kabsch_sander']
 # Functions
 ##############################################################################
 
-def wernet_nilsson(traj, exclude_water=True, periodic=True, sidechain_only=False,
+def wernet_nilsson(traj, exclude_water=False, periodic=True, sidechain_only=False,
                    interesting_atoms=None):
     """Identify hydrogen bonds based on cutoffs for the Donor-H...Acceptor
     distance and angle according to the criterion outlined in [1].
@@ -58,7 +58,7 @@ def wernet_nilsson(traj, exclude_water=True, periodic=True, sidechain_only=False
     ----------
     traj : md.Trajectory
         An mdtraj trajectory. It must contain topology information.
-    exclude_water : bool, default=True
+    exclude_water : bool, default=False
         Exclude solvent molecules from consideration.
     periodic : bool, default=True
         Set to True to calculate displacements and angles across periodic box boundaries.
@@ -147,7 +147,7 @@ def wernet_nilsson(traj, exclude_water=True, periodic=True, sidechain_only=False
     return [bond_triplets.compress(present, axis=0) for present in presence]
 
 
-def baker_hubbard(traj, freq=0.1, exclude_water=True, periodic=True, sidechain_only=False,
+def baker_hubbard(traj, freq=0.1, exclude_water=False, periodic=True, sidechain_only=False,
                   interesting_atoms=None,
                   distance_cutoff=0.25, angle_cutoff=120):
     """Identify hydrogen bonds based on cutoffs for the Donor-H...Acceptor
@@ -167,7 +167,7 @@ def baker_hubbard(traj, freq=0.1, exclude_water=True, periodic=True, sidechain_o
     freq : float, default=0.1
         Return only hydrogen bonds that occur in greater this fraction of the
         frames in the trajectory.
-    exclude_water : bool, default=True
+    exclude_water : bool, default=False
         Exclude solvent molecules from consideration
     periodic : bool, default=True
         Set to True to calculate displacements and angles across periodic box boundaries.
