@@ -28,7 +28,6 @@ def orient(p, p0, pZ, pX):
     el eje Z está orientado de "p0" a "pZ", y el eje X está orientado de "p0" al punto "pX" proyectado
     sobre el plano perpendicular al nuevo eje Z
     '''
-    
     vZ = pZ - p0 # Vector from p0 to pZ
     uZ = vZ/np.linalg.norm(vZ) # Vector del nuevo eje Z
     
@@ -125,20 +124,20 @@ def select_atoms(traj, N_rings, N_res, myselection):
 class MyParams:
     def __init__(self, traj, N_tubes, N_rings, N_res, myselections):
         
-        self.N_tubes = N_tubes
-        self.N_rings = N_rings
-        self.N_res = N_res
+        self.N_tubes = N_tubes # Número de tubos en el sistema
+        self.N_rings = N_rings # Número de anillos en un tubo
+        self.N_res = N_res # Número de residuos en un anillo
         N_allres = N_tubes*N_rings*N_res
         self.N_allres = N_allres
 
         self.CAs = select_atoms(traj, N_rings, N_res, MyAtomSelection("CA", None, "name CA"))
-        self.bbNs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbN", None, "name N and resid 1 to " + str(N_allres)))
-        self.bbOs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbO", None, "name O and resid 1 to " + str(N_allres)))
+        self.bbNs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbN", None, "name N and resid 0 to " + str(N_allres-1)))
+        self.bbOs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbO", None, "name O and resid 0 to " + str(N_allres-1)))
         
-        others = np.array([], dtype=object)
+        bondable = np.concatenate((self.bbNs, self.bbOs))
         for myselection in myselections:
-            others = np.concatenate((others, select_atoms(traj, N_rings, N_res, myselection)))
-        self.others = others
+            bondable = np.concatenate((bondable, select_atoms(traj, N_rings, N_res, myselection)))
+        self.bondable = bondable
         
         self.WATs = traj.top.select("water and name O")
         self.IONs = traj.top.select("element Cl")
@@ -146,6 +145,14 @@ class MyParams:
 
 
 def get_reslist(N_rings, N_res, tube, residues):
+    '''
+    Uso: get_reslist(6, 8, 0, [1, 3])
+    Devuelve: [1, 11, 17, 27, 33, 43]
+    Cada ring tiene 8 residuos, que numeramos del 0 al 7.
+    Para el primer ring del tubo 0 devuelve el resid del residuo 1 del ring,
+    para el segundo ring del tubo 0 devuelve el resid del residuo 3 del ring.
+    Para el tercer ring de nuevo el residuo 1, para el cuarto ring el residuo 3 y así...
+    '''
     reslist = []
     for layer in range(N_rings):
         reslist.append(tube*N_rings*N_res + layer*N_res + residues[layer%len(residues)])
@@ -154,6 +161,10 @@ def get_reslist(N_rings, N_res, tube, residues):
 
 
 def get_channel_reslist(N_rings, N_res, tubes, tuberesidues):
+    '''
+    Uso: get_channel_reslist(6, 8, [0, 1], [[1, 3], [5, 5])
+    Devuelve concatenadas get_reslist(6, 8, 0, [1, 3]) y get_reslist(6, 8, 1, [5, 5])
+    '''
     reslist = []
     for i, tube in enumerate(tubes):
         reslist.append(get_reslist(N_rings, N_res, tube, tuberesidues[i]))
@@ -168,6 +179,14 @@ def get_atoms_in_reslist(myatoms, reslist):
 
 def get_indices_in_layer(myatoms, layer):
     return np.array([atom.index for atom in myatoms if atom.layer == layer])
+#end
+
+
+def get_indices_between_layers(myatoms, firstlayer, lastlayer):
+    indices = np.array([], dtype=int)
+    for layer in range(firstlayer, lastlayer+1):
+        indices = np.concatenate((indices, get_indices_in_layer(myatoms, layer)))
+    return indices
 #end
 
 
