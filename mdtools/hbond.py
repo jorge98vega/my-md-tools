@@ -37,7 +37,8 @@ __all__ = ['wernet_nilsson', 'baker_hubbard', 'kabsch_sander']
 # Functions
 ##############################################################################
 
-def wernet_nilsson(traj, exclude_water=True, periodic=True, sidechain_only=False):
+def wernet_nilsson(traj, exclude_water=False, periodic=True, sidechain_only=False,
+                   interesting_atoms=None):
     """Identify hydrogen bonds based on cutoffs for the Donor-H...Acceptor
     distance and angle according to the criterion outlined in [1].
     As opposed to Baker-Hubbard, this is a "cone" criterion where the
@@ -50,19 +51,21 @@ def wernet_nilsson(traj, exclude_water=True, periodic=True, sidechain_only=False
 
     When donor the donor is 'O' and the acceptor is 'O', this corresponds to
     the definition established in [1]_. The donors considered by this method
-    are NH and OH, and the acceptors considered are O and N. In the paper the only
-    donor considered is OH.
+    are NH and OH, and the acceptors considered are O and N (and Cl and F).
+    In the paper the only donor considered is OH.
 
     Parameters
     ----------
     traj : md.Trajectory
         An mdtraj trajectory. It must contain topology information.
-    exclude_water : bool, default=True
+    exclude_water : bool, default=False
         Exclude solvent molecules from consideration.
     periodic : bool, default=True
         Set to True to calculate displacements and angles across periodic box boundaries.
     sidechain_only : bool, default=False
         Set to True to only consider sidechain-sidechain interactions.
+    interesting_atoms : list, default=None
+        If not None, inlude only atoms whose indices are in the list.
 
     Returns
     -------
@@ -125,7 +128,8 @@ def wernet_nilsson(traj, exclude_water=True, periodic=True, sidechain_only=False
 
     # Get the possible donor-hydrogen...acceptor triplets
     bond_triplets = _get_bond_triplets(traj.topology,
-        exclude_water=exclude_water, sidechain_only=sidechain_only)
+        exclude_water=exclude_water, sidechain_only=sidechain_only,
+        interesting_atoms=interesting_atoms)
 
     # Compute geometry
     mask, distances, angles = _compute_bounded_geometry(traj, bond_triplets,
@@ -143,7 +147,8 @@ def wernet_nilsson(traj, exclude_water=True, periodic=True, sidechain_only=False
     return [bond_triplets.compress(present, axis=0) for present in presence]
 
 
-def baker_hubbard(traj, freq=0.1, exclude_water=True, periodic=True, sidechain_only=False,
+def baker_hubbard(traj, freq=0.1, exclude_water=False, periodic=True, sidechain_only=False,
+                  interesting_atoms=None, return_distances=False,
                   distance_cutoff=0.25, angle_cutoff=120):
     """Identify hydrogen bonds based on cutoffs for the Donor-H...Acceptor
     distance and angle.
@@ -153,7 +158,7 @@ def baker_hubbard(traj, freq=0.1, exclude_water=True, periodic=True, sidechain_o
 
     When donor the donor is 'N' and the acceptor is 'O', this corresponds to
     the definition established in [1]_. The donors considered by this method
-    are NH and OH, and the acceptors considered are O and N.
+    are NH and OH, and the acceptors considered are O and N (and Cl and F).
 
     Parameters
     ----------
@@ -161,13 +166,17 @@ def baker_hubbard(traj, freq=0.1, exclude_water=True, periodic=True, sidechain_o
         An mdtraj trajectory. It must contain topology information.
     freq : float, default=0.1
         Return only hydrogen bonds that occur in greater this fraction of the
-        frames in the trajectory.
-    exclude_water : bool, default=True
+        frames in the trajectory. (Only if return_distances is False).
+    exclude_water : bool, default=False
         Exclude solvent molecules from consideration
     periodic : bool, default=True
         Set to True to calculate displacements and angles across periodic box boundaries.
     sidechain_only : bool, default=False
         Set to True to only consider sidechain-sidechain interactions.
+    interesting_atoms : list, default=None
+        If not None, inlude only atoms whose indices are in the list.
+    return_distances : bool, default=False
+        Set to True to return the H...Acceptor distances of thr hydrogen bonds.
     distance_cutoff : float, default=0.25
         Distance cutoff of Donor-H...Acceptor contact in nanometers. 
         The criterion employed is any contact that is shorter than the distance cutoff.
@@ -184,8 +193,15 @@ def baker_hubbard(traj, freq=0.1, exclude_water=True, periodic=True, sidechain_o
         hydrogen bonds. Each row contains three integer indices, `(d_i, h_i,
         a_i)`, such that `d_i` is the index of the donor atom, `h_i` the index
         of the hydrogen atom, and `a_i` the index of the acceptor atom involved
-        in a hydrogen bond which occurs (according to the definition above) in
-        proportion greater than `freq` of the trajectory.
+        in a hydrogen bond which occurs (according to the definition above,
+        and only if return_distances is False) in proportion greater than `freq`
+        of the trajectory.
+    distances : np.array, shape=[n_frames, n_hbonds], dtype=float, optional
+        An array containing the distances between the hydrogen and the acceptor of
+        each hydrogen bond. Only provided if return_distances is True.
+    presence : np.array, shape=[n_frames, n_hbonds], dtype=bool, optional
+        An array containing the truth value of the hbonds satisfying the distance
+        and angle conditions. Only provided if return_distances is True.
 
     Notes
     -----
@@ -235,15 +251,18 @@ def baker_hubbard(traj, freq=0.1, exclude_water=True, periodic=True, sidechain_o
 
     # Get the possible donor-hydrogen...acceptor triplets
     bond_triplets = _get_bond_triplets(traj.topology,
-        exclude_water=exclude_water, sidechain_only=sidechain_only)
+        exclude_water=exclude_water, sidechain_only=sidechain_only,
+        interesting_atoms=interesting_atoms)
 
     mask, distances, angles = _compute_bounded_geometry(traj, bond_triplets,
         distance_cutoff, [1, 2], [0, 1, 2], freq=freq, periodic=periodic)
 
     # Find triplets that meet the criteria
     presence = np.logical_and(distances < distance_cutoff, angles > angle_cutoff)
-    mask[mask] = np.mean(presence, axis=0) > freq
 
+    if return_distances: ## ¿Así o devolverlo siempre?
+        return bond_triplets.compress(mask, axis=0), distances, presence
+    mask[mask] = np.mean(presence, axis=0) > freq
     return bond_triplets.compress(mask, axis=0)
 
 
@@ -325,13 +344,17 @@ def kabsch_sander(traj):
     return matrices
 
 
-def _get_bond_triplets(topology, exclude_water=True, sidechain_only=False):
+def _get_bond_triplets(topology, exclude_water=True, sidechain_only=False,
+                       interesting_atoms=None):
     def can_participate(atom):
         # Filter waters
         if exclude_water and atom.residue.is_water:
             return False
         # Filter non-sidechain atoms
         if sidechain_only and not atom.is_sidechain:
+            return False
+        # Filter non-interesting atoms
+        if interesting_atoms is not None and atom.index not in interesting_atoms:
             return False
         # Otherwise, accept it
         return True
@@ -377,7 +400,7 @@ def _get_bond_triplets(topology, exclude_water=True, sidechain_only=False):
         # no possible pairs and return nothing
         return np.zeros((0, 3), dtype=int)
 
-    acceptor_elements = frozenset(('O', 'N'))
+    acceptor_elements = frozenset(('O', 'N', 'Cl', 'F'))
     acceptors = [a.index for a in topology.atoms
         if a.element.symbol in acceptor_elements and can_participate(a)]
 

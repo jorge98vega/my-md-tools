@@ -28,7 +28,6 @@ def orient(p, p0, pZ, pX):
     el eje Z está orientado de "p0" a "pZ", y el eje X está orientado de "p0" al punto "pX" proyectado
     sobre el plano perpendicular al nuevo eje Z
     '''
-    
     vZ = pZ - p0 # Vector from p0 to pZ
     uZ = vZ/np.linalg.norm(vZ) # Vector del nuevo eje Z
     
@@ -82,63 +81,91 @@ def recenter_traj_RMSD(run_name, N_tubes, N_res):
 
 
 class MyAtom:
-    def __init__(self, index, name, residue, resname, tube=None, layer=None):
+    def __init__(self, top, N_rings, N_res, index):
+        atom = top.atom(index)
         self.index = index
-        self.name = name
-        self.residue = residue
-        self.resname = resname
-        self.tube = tube
-        self.layer = layer
+        self.name = atom.name
+        self.resid = atom.residue.index
+        self.resname = atom.residue.name
+        if atom.residue.is_protein:
+            self.tube = atom.residue.index//(N_rings*N_res)
+            self.layer = (atom.residue.index//N_res)%N_rings
+        else:
+            self.tube = None
+            self.layer = None
     
     def __str__(self): # print()
-        return "MyAtom(index=" + str(self.index) + ", name=" + str(self.name) + ", residue=" + str(self.residue) + ", resname=" + str(self.resname) + ", tube=" + str(self.tube) + ", layer=" + str(self.layer) + ")"
+        return "MyAtom(index=" + str(self.index) + ", name=" + str(self.name) + ", resid=" + str(self.resid) + ", resname=" + str(self.resname) + ", tube=" + str(self.tube) + ", layer=" + str(self.layer) + ")"
     
     def __repr__(self):
-        return "MyAtom(index=" + str(self.index) + ", name=" + str(self.name) + ", residue=" + str(self.residue) + ", resname=" + str(self.resname) + ", tube=" + str(self.tube) + ", layer=" + str(self.layer) + ")"
+        return "MyAtom(index=" + str(self.index) + ", name=" + str(self.name) + ", resid=" + str(self.resid) + ", resname=" + str(self.resname) + ", tube=" + str(self.tube) + ", layer=" + str(self.layer) + ")"
 #end
 
 
-class MyAtomSelection:
-    def __init__(self, name, resname, selection=None):
-        self.name = name
-        self.resname = resname
-        if selection is None: self.selection = "name " + name + " and resname " + resname
-        else: self.selection = selection
+# class MyAtom:
+#     def __init__(self, index, name, residue, resname, tube=None, layer=None):
+#         self.index = index
+#         self.name = name
+#         self.resid = residue
+#         self.resname = resname
+#         self.tube = tube
+#         self.layer = layer
+# #end
+
+
+# class MyAtomSelection:
+#     def __init__(self, name, resname, selection=None):
+#         self.name = name
+#         self.resname = resname
+#         if selection is None: self.selection = "name " + name + " and resname " + resname
+#         else: self.selection = selection
         
-    def __str__(self): # print()
-        return "MyAtomSelection(name=" + str(self.name) + ", resname=" + str(self.resname) + ", selection=" + str(self.selection) + ")"
+#     def __str__(self): # print()
+#         return "MyAtomSelection(name=" + str(self.name) + ", resname=" + str(self.resname) + ", selection=" + str(self.selection) + ")"
     
-    def __repr__(self):
-        return "MyAtomSelection(name=" + str(self.name) + ", resname=" + str(self.resname) + ", selection=" + str(self.selection) + ")"
-#end
+#     def __repr__(self):
+#         return "MyAtomSelection(name=" + str(self.name) + ", resname=" + str(self.resname) + ", selection=" + str(self.selection) + ")"
+# #end
 
 
-def select_atoms(traj, N_rings, N_res, myselection):
+def select_atoms(top, N_rings, N_res, selection):
     return np.array([
-        MyAtom(atom.index, myselection.name, atom.residue.index, myselection.resname,
-               atom.residue.index//(N_rings*N_res), (atom.residue.index//N_res)%N_rings)
-        for atom in [traj.top.atom(index) for index in traj.top.select(myselection.selection)]
+        MyAtom(top, N_rings, N_res, index)
+        for index in top.select(selection)
     ])
 #end
 
 
+# def select_atoms(traj, N_rings, N_res, myselection):
+#     return np.array([
+#         MyAtom(atom.index, myselection.name, atom.residue.index, myselection.resname,
+#                atom.residue.index//(N_rings*N_res), (atom.residue.index//N_res)%N_rings)
+#         for atom in [traj.top.atom(index) for index in traj.top.select(myselection.selection)]
+#     ])
+# #end
+
+
 class MyParams:
-    def __init__(self, traj, N_tubes, N_rings, N_res, myselections):
+    def __init__(self, traj, N_tubes, N_rings, N_res, selections):
         
-        self.N_tubes = N_tubes
-        self.N_rings = N_rings
-        self.N_res = N_res
+        self.N_tubes = N_tubes # Número de tubos en el sistema
+        self.N_rings = N_rings # Número de anillos en un tubo
+        self.N_res = N_res # Número de residuos en un anillo
         N_allres = N_tubes*N_rings*N_res
         self.N_allres = N_allres
-
-        self.CAs = select_atoms(traj, N_rings, N_res, MyAtomSelection("CA", None, "name CA"))
-        self.bbNs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbN", None, "name N and resid 1 to " + str(N_allres)))
-        self.bbOs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbO", None, "name O and resid 1 to " + str(N_allres)))
         
-        others = np.array([], dtype=object)
-        for myselection in myselections:
-            others = np.concatenate((others, select_atoms(traj, N_rings, N_res, myselection)))
-        self.others = others
+        top = traj.top
+        self.CAs = select_atoms(top, N_rings, N_res, "name CA")
+        self.bbNs = select_atoms(top, N_rings, N_res, "name N and resid 0 to " + str(N_allres-1))
+        self.bbOs = select_atoms(top, N_rings, N_res, "name O and resid 0 to " + str(N_allres-1))
+#         self.CAs = select_atoms(traj, N_rings, N_res, MyAtomSelection("CA", None, "name CA"))
+#         self.bbNs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbN", None, "name N and resid 0 to " + str(N_allres-1)))
+#         self.bbOs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbO", None, "name O and resid 0 to " + str(N_allres-1)))
+        
+        bondable = np.concatenate((self.bbNs, self.bbOs))
+        for selection in selections:
+            bondable = np.concatenate((bondable, select_atoms(top, N_rings, N_res, selection)))
+        self.bondable = bondable
         
         self.WATs = traj.top.select("water and name O")
         self.IONs = traj.top.select("element Cl")
@@ -146,6 +173,14 @@ class MyParams:
 
 
 def get_reslist(N_rings, N_res, tube, residues):
+    '''
+    Uso: get_reslist(6, 8, 0, [1, 3])
+    Devuelve: [1, 11, 17, 27, 33, 43]
+    Cada ring tiene 8 residuos, que numeramos del 0 al 7.
+    Para el primer ring del tubo 0 devuelve el resid del residuo 1 del ring,
+    para el segundo ring del tubo 0 devuelve el resid del residuo 3 del ring.
+    Para el tercer ring de nuevo el residuo 1, para el cuarto ring el residuo 3 y así...
+    '''
     reslist = []
     for layer in range(N_rings):
         reslist.append(tube*N_rings*N_res + layer*N_res + residues[layer%len(residues)])
@@ -154,6 +189,10 @@ def get_reslist(N_rings, N_res, tube, residues):
 
 
 def get_channel_reslist(N_rings, N_res, tubes, tuberesidues):
+    '''
+    Uso: get_channel_reslist(6, 8, [0, 1], [[1, 3], [5, 5])
+    Devuelve concatenadas get_reslist(6, 8, 0, [1, 3]) y get_reslist(6, 8, 1, [5, 5])
+    '''
     reslist = []
     for i, tube in enumerate(tubes):
         reslist.append(get_reslist(N_rings, N_res, tube, tuberesidues[i]))
@@ -162,12 +201,20 @@ def get_channel_reslist(N_rings, N_res, tubes, tuberesidues):
 
 
 def get_atoms_in_reslist(myatoms, reslist):
-    return np.array([atom for atom in myatoms if atom.residue in reslist])
+    return np.array([atom for atom in myatoms if atom.resid in reslist])
 #end
 
 
 def get_indices_in_layer(myatoms, layer):
     return np.array([atom.index for atom in myatoms if atom.layer == layer])
+#end
+
+
+def get_indices_between_layers(myatoms, firstlayer, lastlayer):
+    indices = np.array([], dtype=int)
+    for layer in range(firstlayer, lastlayer+1):
+        indices = np.concatenate((indices, get_indices_in_layer(myatoms, layer)))
+    return indices
 #end
 
 

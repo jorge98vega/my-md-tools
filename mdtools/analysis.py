@@ -272,24 +272,29 @@ def check_hbonds(distance_cutoff, angle_cutoff, step, frame, iatom, ihs, ilabel,
 
 
 def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
-            distance_cutoff=2.5, angle_cutoff=2*np.pi/3, first=None, last=None, xtal=False):
+            distance_cutoff=2.5, angle_cutoff=120, first=None, last=None, xtal=False):
     
     if boundary is None: boundary = layer
-        
-    if not xtal: lvs = None
     
     if first is None: first = 0
     if last is None: last = len(traj)
     
     iterWATs = np.load("iterWATs_"+label+".npy", allow_pickle=True)
     iterIONs = np.load("iterIONs_"+label+".npy", allow_pickle=True)
+    bondable = get_indices_between_layers(p.bondable, layer, p.N_rings-layer-1)
     if layer != boundary:
         iterWATs_b = np.load("iterWATs_"+label+"_b.npy", allow_pickle=True)
         iterIONs_b = np.load("iterIONs_"+label+"_b.npy", allow_pickle=True)
+        bondable_b = get_indices_between_layers(p.bondable, boundary, layer-1)
+        bondable_b = np.concatenate(bondable_b, get_indices_between_layers(p.bondable, p.N_rings-layer, p.N_rings-boundary-1))
     
     # Base de datos de las estadísticas como una lista de diccionarios
-    # | Step | Número de aguas | Número de iones | Número de puentes| Distancia media puentes |
+    # | Step | Número de aguas | Número de iones | Número de puentes | Distancia media puentes |
     stats_dicts = []
+    
+    # Base de datos de los puentes de hidrógeno como una lista de diccionarios - complementario al grafo (abajo)
+    # | Step | Donor | Hydrogen | Acceptor | Distance |
+    hbonds_dicts = []
     
     # Grafo los puentes de H
     hbonds_G = nx.MultiDiGraph()
@@ -304,22 +309,26 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
             IONs_b = iterIONs_b[step]
         else:
             WATs_b = np.array([], dtype=int)
-            CLs_b = np.array([], dtype=int)
-        
-        if xtal: lvs = np.array([frame.box[0], frame.box[1], frame.box[2]])
+            IONS_b = np.array([], dtype=int)
+        b = np.concatenate((WATs_b, IONS_b, bondable_b))
         
         N_hbonds = 0
         d_ave = 0.0
         
         # Buscamos los puentes de H del frame
         
-        
-        atoms = np.concatenate((WATs, IONs))
-        coordinates = frame[atoms]
-        if xtal: distances = periodic_pdist(coordinates, lvs)
-        else: distances = pdist(coordinates)
-        
-        
+        interesting_atoms = np.concatenate((WATs, IONs, bondable, b))
+        triplets, distances, presence = baker_hubbard(frame, periodic=xtal,
+                                                      interesting_atoms=interesting_atoms, return_distances=True,
+                                                      distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
+        for (donor, h, acceptor), d in zip(triplets[presence[0]], distances[0][presence[0]]):
+            if donor in b and acceptor in b:
+                continue
+            mydonor = MyAtom(traj.top, p.N_rings, p.N_res, donor)
+            myacceptor = MyAtom(traj.top, p.N_rings, p.N_res, acceptor)
+            hbonds_G.add_edge(mydonor, myacceptor, step=step, h=h, d=10.0*d)
+            hbonds_dicts.append({'step': step, 'donor': mydonor, 'h': h, 'acceptor': myacceptor, 'd': 10.0*d})
+            
         # Guardamos las estadísticas
         
         if N_hbonds != 0: d_ave = d_ave/N_hbonds
@@ -327,7 +336,12 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
     
     # Guardamos la información
     
-    pickle.dump(hbonds_G, open(label+'hbonds.txt', 'wb'))
+    pickle.dump(hbonds_G, open(label+'hbondsG.txt', 'wb'))
+    hbonds_df = pd.DataFrame(hbonds_dicts)
+    hbonds_df.to_csv(label+"_hbonds.csv")
     stats_df = pd.DataFrame(stats_dicts)
     stats_df.to_csv(label+"_stats.csv")
 #end
+
+
+### EOF ###
