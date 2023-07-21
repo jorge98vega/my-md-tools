@@ -289,8 +289,12 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
         bondable_b = np.concatenate(bondable_b, get_indices_between_layers(p.bondable, p.N_rings-layer, p.N_rings-boundary-1))
     
     # Base de datos de las estadísticas como una lista de diccionarios
-    # | Step | Número de aguas | Número de iones | Número de puentes| Distancia media puentes |
+    # | Step | Número de aguas | Número de iones | Número de puentes | Distancia media puentes |
     stats_dicts = []
+    
+    # Base de datos de los puentes de hidrógeno como una lista de diccionarios - complementario al grafo (abajo)
+    # | Step | Donor | Hydrogen | Acceptor | Distance |
+    hbonds_dicts = []
     
     # Grafo los puentes de H
     hbonds_G = nx.MultiDiGraph()
@@ -314,14 +318,16 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
         # Buscamos los puentes de H del frame
         
         interesting_atoms = np.concatenate((WATs, IONs, bondable, b))
-        triplets = baker_hubbard(frame, periodic=xtal, interesting_atoms=interesting_atoms,
-                      distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
-        for donor, h, acceptor in triplets:
+        triplets, distances, presence = baker_hubbard(frame, periodic=xtal,
+                                                      interesting_atoms=interesting_atoms, return_distances=True,
+                                                      distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
+        for (donor, h, acceptor), d in zip(triplets[presence[0]], distances[0][presence[0]]):
             if donor in b and acceptor in b:
                 continue
-            mydonor = 
-            myacceptor = 
-            hbonds_G.add_edge(mydonor, myacceptor, h=h, step=step)
+            mydonor = MyAtom(traj.top, p.N_rings, p.N_res, donor)
+            myacceptor = MyAtom(traj.top, p.N_rings, p.N_res, acceptor)
+            hbonds_G.add_edge(mydonor, myacceptor, step=step, h=h, d=10.0*d)
+            hbonds_dicts.append({'step': step, 'donor': mydonor, 'h': h, 'acceptor': myacceptor, 'd': 10.0*d})
             
         # Guardamos las estadísticas
         
@@ -330,7 +336,12 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
     
     # Guardamos la información
     
-    pickle.dump(hbonds_G, open(label+'hbonds.txt', 'wb'))
+    pickle.dump(hbonds_G, open(label+'hbondsG.txt', 'wb'))
+    hbonds_df = pd.DataFrame(hbonds_dicts)
+    hbonds_df.to_csv(label+"_hbonds.csv")
     stats_df = pd.DataFrame(stats_dicts)
     stats_df.to_csv(label+"_stats.csv")
 #end
+
+
+### EOF ###
