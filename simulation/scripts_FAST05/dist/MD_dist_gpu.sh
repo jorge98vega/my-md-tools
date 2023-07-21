@@ -12,7 +12,7 @@ JOB=${INPUT}_dist
 #######################################################################
 # RUN SIMULATION
 
-for i in {0..4..1}
+for i in {0..49..1}
 #i=0
 do
 j=$(( i + 1 ))
@@ -29,7 +29,7 @@ measure_dist_md
  ntp = 1, ntf = 2, ntc = 2, ntb = 2, cut = 10, ! (Presión, SHAKE, PBCs)
  imin = 0, ! (Flags de minimización)
  nstlim = 100000, dt = 0.002, ! (Flags de dinámica molecular)
- temp0 = 300, tempi = 300, ntt = 3, gamma_ln = 5, ! (Control de la temperatura)
+ temp0 = 300, tempi = 300, ig = -1, ntt = 3, gamma_ln = 5, ! (Control de la temperatura)
  &end
  &wt type = 'DUMPFREQ', istep1 = 1000, /
  &wt type = 'END' &end
