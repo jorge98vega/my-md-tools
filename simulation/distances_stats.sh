@@ -6,7 +6,7 @@ RUN=prod
 > ${DIR}/${MOL}_stats.dat
 
 INI=1 # Primer archivo
-FIN=5 # Ultimo archivo
+FIN=50 # Ultimo archivo
 COLS=( 7 8 1 9 10 2 11 12 3 13 14 4 15 16 5 17 18 6 ) # Columnas
 
 i=$INI
