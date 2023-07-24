@@ -2,7 +2,6 @@
 
 
 from mdtools.core import *
-from mdtools.hbond import *
 
 
 ### ANALYSIS ###
