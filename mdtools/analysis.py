@@ -318,9 +318,9 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
         # Buscamos los puentes de H del frame
         
         interesting_atoms = np.concatenate((WATs, IONs, bondable, b))
-        triplets, distances, presence = baker_hubbard(frame, periodic=xtal,
-                                                      interesting_atoms=interesting_atoms, return_distances=True,
-                                                      distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
+        triplets, distances, presence = md.baker_hubbard(frame, periodic=xtal,
+                                                         interesting_atoms=interesting_atoms, return_distances=True,
+                                                         distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
         for (donor, h, acceptor), d in zip(triplets[presence[0]], distances[0][presence[0]]):
             if donor in b and acceptor in b:
                 continue
