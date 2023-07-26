@@ -205,6 +205,11 @@ def get_atoms_in_reslist(myatoms, reslist):
 #end
 
 
+def get_indices(myatoms):
+    return np.array([atom.index for atom in myatoms])
+#end
+
+
 def get_indices_in_layer(myatoms, layer):
     return np.array([atom.index for atom in myatoms if atom.layer == layer])
 #end
