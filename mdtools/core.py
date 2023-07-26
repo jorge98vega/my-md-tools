@@ -102,47 +102,12 @@ class MyAtom:
 #end
 
 
-# class MyAtom:
-#     def __init__(self, index, name, residue, resname, tube=None, layer=None):
-#         self.index = index
-#         self.name = name
-#         self.resid = residue
-#         self.resname = resname
-#         self.tube = tube
-#         self.layer = layer
-# #end
-
-
-# class MyAtomSelection:
-#     def __init__(self, name, resname, selection=None):
-#         self.name = name
-#         self.resname = resname
-#         if selection is None: self.selection = "name " + name + " and resname " + resname
-#         else: self.selection = selection
-        
-#     def __str__(self): # print()
-#         return "MyAtomSelection(name=" + str(self.name) + ", resname=" + str(self.resname) + ", selection=" + str(self.selection) + ")"
-    
-#     def __repr__(self):
-#         return "MyAtomSelection(name=" + str(self.name) + ", resname=" + str(self.resname) + ", selection=" + str(self.selection) + ")"
-# #end
-
-
 def select_atoms(top, N_rings, N_res, selection):
     return np.array([
         MyAtom(top, N_rings, N_res, index)
         for index in top.select(selection)
     ])
 #end
-
-
-# def select_atoms(traj, N_rings, N_res, myselection):
-#     return np.array([
-#         MyAtom(atom.index, myselection.name, atom.residue.index, myselection.resname,
-#                atom.residue.index//(N_rings*N_res), (atom.residue.index//N_res)%N_rings)
-#         for atom in [traj.top.atom(index) for index in traj.top.select(myselection.selection)]
-#     ])
-# #end
 
 
 class MyParams:
@@ -158,9 +123,6 @@ class MyParams:
         self.CAs = select_atoms(top, N_rings, N_res, "name CA")
         self.bbNs = select_atoms(top, N_rings, N_res, "name N and resid 0 to " + str(N_allres-1))
         self.bbOs = select_atoms(top, N_rings, N_res, "name O and resid 0 to " + str(N_allres-1))
-#         self.CAs = select_atoms(traj, N_rings, N_res, MyAtomSelection("CA", None, "name CA"))
-#         self.bbNs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbN", None, "name N and resid 0 to " + str(N_allres-1)))
-#         self.bbOs = select_atoms(traj, N_rings, N_res, MyAtomSelection("bbO", None, "name O and resid 0 to " + str(N_allres-1)))
         
         bondable = np.concatenate((self.bbNs, self.bbOs))
         for selection in selections:
