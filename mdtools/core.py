@@ -195,7 +195,7 @@ def get_channel_reslist(N_rings, N_res, tubes, tuberesidues):
     '''
     reslist = []
     for i, tube in enumerate(tubes):
-        reslist.append(get_reslist(N_rings, N_res, tube, tuberesidues[i]))
+        reslist += get_reslist(N_rings, N_res, tube, tuberesidues[i])
     return reslist
 #end
 
