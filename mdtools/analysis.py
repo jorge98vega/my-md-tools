@@ -35,17 +35,17 @@ def get_indices(traj, WATs, IONs, CAs, N_rings, layer=0, boundary=None,
         iterIONs_b = []
     
     atoms_top = get_indices_in_layer(CAs, layer)
-    atoms_bot = get_indices_in_layer(CAs, Nrings-layer)
+    atoms_bot = get_indices_in_layer(CAs, N_rings-layer-1)
     if layer != boundary:
-        atoms_top_b = get_atoms_in_layer(CAs, layer-boundary)
-        atoms_bot_b = get_atoms_in_layer(CAs, Nrings-(layer-boundary))
+        atoms_top_b = get_indices_in_layer(CAs, boundary)
+        atoms_bot_b = get_indices_in_layer(CAs, N_rings-boundary-1)
     
     if preselected:
         auxWATs = WATs
         auxIONs = IONs
     
     for step in range(first, last):
-        frame = traj[step]
+        frame = traj.slice(step, copy=False).xyz[0]
         
         if preselected:
             WATs = auxWATs[step]
@@ -79,8 +79,9 @@ def get_indices(traj, WATs, IONs, CAs, N_rings, layer=0, boundary=None,
                 
         aux = np.array(aux)
         iterWATs.append(aux)
-        aux_b = np.array(aux_b)
-        iterWATs_b.append(aux_b)
+        if layer != boundary:
+            aux_b = np.array(aux_b)
+            iterWATs_b.append(aux_b)
         
         # Iones en la región
         aux = []
@@ -95,8 +96,9 @@ def get_indices(traj, WATs, IONs, CAs, N_rings, layer=0, boundary=None,
                 
         aux = np.array(aux)
         iterIONs.append(aux)
-        aux_b = np.array(aux_b)
-        iterIONs_b.append(aux_b)
+        if layer != boundary:
+            aux_b = np.array(aux_b)
+            iterIONs_b.append(aux_b)
     
     iterWATs = np.array(iterWATs, dtype=object)
     iterIONs = np.array(iterIONs, dtype=object)
@@ -130,10 +132,10 @@ def get_indices_xtal(traj, WATs, IONs, CAs, N_rings, delta_r=0.0, offsets=None, 
     
     layer = 0
     atoms_top = get_atoms_in_layer(CAs, layer)
-    atoms_bot = get_atoms_in_layer(CAs, Nrings-layer)
+    atoms_bot = get_atoms_in_layer(CAs, Nrings-layer-1)
     
     for step in range(first, last):
-        frame = traj[step]
+        frame = traj.slice(step, copy=False).xyz[0]
         lvs = np.array([frame.box[0], frame.box[1], frame.box[2]])
         
         # Centro de la región
@@ -270,7 +272,7 @@ def check_hbonds(distance_cutoff, angle_cutoff, step, frame, iatom, ihs, ilabel,
 #end
 
 
-def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
+def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
             distance_cutoff=2.5, angle_cutoff=120, first=None, last=None, xtal=False):
     
     if boundary is None: boundary = layer
@@ -280,12 +282,19 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
     
     iterWATs = np.load("iterWATs_"+label+".npy", allow_pickle=True)
     iterIONs = np.load("iterIONs_"+label+".npy", allow_pickle=True)
-    bondable = get_indices_between_layers(p.bondable, layer, p.N_rings-layer-1)
+    bondable_atoms = get_atoms_in_reslist(p.bondable, reslist)
+    bondable = get_indices_between_layers(bondable_atoms, layer, p.N_rings-layer-1)
+    backbone = get_indices_between_layers(np.concatenate((p.bbNs, p.bbOs)), layer, p.N_rings-layer-1)
     if layer != boundary:
         iterWATs_b = np.load("iterWATs_"+label+"_b.npy", allow_pickle=True)
         iterIONs_b = np.load("iterIONs_"+label+"_b.npy", allow_pickle=True)
-        bondable_b = get_indices_between_layers(p.bondable, boundary, layer-1)
-        bondable_b = np.concatenate(bondable_b, get_indices_between_layers(p.bondable, p.N_rings-layer, p.N_rings-boundary-1))
+        bondable_b = get_indices_between_layers(bondable_atoms, boundary, layer-1)
+        bondable_b = np.concatenate((bondable_b, get_indices_between_layers(bondable_atoms, p.N_rings-layer, p.N_rings-boundary-1)))
+        backbone_b = get_indices_between_layers(np.concatenate((p.bbNs, p.bbOs)), boundary, layer-1)
+        backbone_b = np.concatenate((backbone_b, get_indices_between_layers(np.concatenate((p.bbNs, p.bbOs)), p.N_rings-layer, p.N_rings-boundary-1)))
+    else:
+        bondable_b = np.array([], dtype=int)
+        backbone_b = np.array([], dtype=int)
     
     # Base de datos de las estadísticas como una lista de diccionarios
     # | Step | Número de aguas | Número de iones | Número de puentes | Distancia media puentes |
@@ -299,7 +308,7 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
     hbonds_G = nx.MultiDiGraph()
     
     for step in range(first, last):
-        frame = traj[step]
+        frame = traj.slice(step, copy=False)
         
         WATs = iterWATs[step]
         IONs = iterIONs[step]
@@ -308,25 +317,29 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
             IONs_b = iterIONs_b[step]
         else:
             WATs_b = np.array([], dtype=int)
-            IONS_b = np.array([], dtype=int)
-        b = np.concatenate((WATs_b, IONS_b, bondable_b))
+            IONs_b = np.array([], dtype=int)
+        b = np.concatenate((WATs_b, IONs_b, bondable_b, backbone_b))
         
         N_hbonds = 0
         d_ave = 0.0
         
         # Buscamos los puentes de H del frame
         
-        interesting_atoms = np.concatenate((WATs, IONs, bondable, b))
+        interesting_atoms = np.concatenate((WATs, IONs, bondable, backbone, b))
         triplets, distances, presence = md.baker_hubbard(frame, periodic=xtal,
                                                          interesting_atoms=interesting_atoms, return_distances=True,
                                                          distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
         for (donor, h, acceptor), d in zip(triplets[presence[0]], distances[0][presence[0]]):
             if donor in b and acceptor in b:
                 continue
+            if donor in backbone and acceptor in backbone:
+                continue
             mydonor = MyAtom(traj.top, p.N_rings, p.N_res, donor)
             myacceptor = MyAtom(traj.top, p.N_rings, p.N_res, acceptor)
             hbonds_G.add_edge(mydonor, myacceptor, step=step, h=h, d=10.0*d)
             hbonds_dicts.append({'step': step, 'donor': mydonor, 'h': h, 'acceptor': myacceptor, 'd': 10.0*d})
+            N_hbonds += 1
+            d_ave += d
             
         # Guardamos las estadísticas
         
@@ -335,7 +348,7 @@ def analyse(p, traj, label, res_list=[], layer=0, boundary=None,
     
     # Guardamos la información
     
-    pickle.dump(hbonds_G, open(label+'hbondsG.txt', 'wb'))
+    pickle.dump(hbonds_G, open(label+'_hbondsG.txt', 'wb'))
     hbonds_df = pd.DataFrame(hbonds_dicts)
     hbonds_df.to_csv(label+"_hbonds.csv")
     stats_df = pd.DataFrame(stats_dicts)

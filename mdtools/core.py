@@ -3,6 +3,7 @@
 
 import math
 import time
+import pickle
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -124,7 +125,7 @@ class MyParams:
         self.bbNs = select_atoms(top, N_rings, N_res, "name N and resid 0 to " + str(N_allres-1))
         self.bbOs = select_atoms(top, N_rings, N_res, "name O and resid 0 to " + str(N_allres-1))
         
-        bondable = np.concatenate((self.bbNs, self.bbOs))
+        bondable = np.array([], dtype=int)
         for selection in selections:
             bondable = np.concatenate((bondable, select_atoms(top, N_rings, N_res, selection)))
         self.bondable = bondable
