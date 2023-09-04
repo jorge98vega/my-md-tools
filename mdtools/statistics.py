@@ -1,7 +1,7 @@
 ### IMPORTS ###
 
 
-from main import *
+from mdtools.core import *
 
 
 ### STATISTICS ###

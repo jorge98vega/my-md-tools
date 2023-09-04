@@ -20,7 +20,7 @@ import pytraj as pt
 import mdtraj as md
 
 
-### MAIN ###
+### CORE ###
 
 
 def orient(p, p0, pZ, pX):

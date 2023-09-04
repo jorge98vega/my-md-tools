@@ -131,12 +131,12 @@ def get_indices_xtal(traj, WATs, IONs, CAs, N_rings, delta_r=0.0, offsets=None, 
     iterIONs = []
     
     layer = 0
-    atoms_top = get_atoms_in_layer(CAs, layer)
-    atoms_bot = get_atoms_in_layer(CAs, Nrings-layer-1)
+    atoms_top = get_indices_in_layer(CAs, layer)
+    atoms_bot = get_indices_in_layer(CAs, N_rings-layer-1)
     
     for step in range(first, last):
         frame = traj.slice(step, copy=False).xyz[0]
-        lvs = np.array([frame.box[0], frame.box[1], frame.box[2]])
+        lvs = traj.slice(0, copy=False).unitcell_lengths[0]
         
         # Centro de la región
         centertop = np.sum(frame[atoms_top], axis=0)/atoms_top.size
@@ -173,102 +173,6 @@ def get_indices_xtal(traj, WATs, IONs, CAs, N_rings, delta_r=0.0, offsets=None, 
     if save:
         np.save(savefileWATs+".npy", iterWATs)
         np.save(savefileIONs+".npy", iterIONs)
-#end
-
-
-def compute_distance(frame, atom_a, atom_b, lvs):
-    
-    a = frame[atom_a]
-    b = frame[atom_b]
-    ba = a - b
-    
-    if lvs is not None:
-        for dim in range(3):
-            if np.abs(ba[dim]) > lvs[dim]/2:
-                ba[dim] = lvs[dim] - np.abs(ba[dim])
-    
-    distance = np.linalg.norm(ba)
-    
-    return distance
-#end
-
-
-def compute_angle(frame, atom_a, atom_b, atom_c, lvs):
-    
-    a = frame[atom_a]
-    b = frame[atom_b]
-    c = frame[atom_c]
-    
-    if lvs is not None:
-        a = wrap_coordinates(a-b, lvs)
-        c = wrap_coordinates(c-b, lvs)
-        b = wrap_coordinates(b-b, lvs)
-    
-    ba = a - b
-    bc = c - b
-
-    cosine = np.dot(ba, bc)/(np.linalg.norm(ba)*np.linalg.norm(bc))
-    angle = np.arccos(cosine)
-    
-    return angle
-#end
-
-
-def check_hbonds(distance_cutoff, angle_cutoff, step, frame, iatom, ihs, ilabel, jatom, jhs, jlabel, lvs,
-                 hbondsdf, N_hbonds, d_ave):
-    
-    # Baker-Hubbard Hydrogen Bond Identification
-    
-    if ihs != 0 and jhs != 0:
-        dim = max(ihs, jhs) + 1
-        ds = 999.9*np.ones((dim, dim))
-        
-        for h in range(1, ihs+1):
-            ds[h, 0] = compute_distance(frame, iatom+h, jatom, lvs)
-            # ds[h, 0] = np.linalg.norm(frame[iatom+h] - frame[jatom]) # del h de iatom a jatom
-        for h in range(1, jhs+1):
-            ds[0, h] = compute_distance(frame, iatom, jatom+h, lvs)
-            # ds[0, h] = np.linalg.norm(frame[iatom] - frame[jatom+h]) # de iatom al h de jatom
-        for index, d in enumerate(ds.flatten()):
-            if d < distance_cutoff:
-                bond = np.unravel_index(index, ds.shape)
-                if bond[0] > bond[1]: # iatom es el donor
-                    if compute_angle(frame, iatom, iatom+bond[0], jatom, lvs) > angle_cutoff:
-                        N_hbonds += 1
-                        d_ave += d
-                        hbondsdf.loc[hbondsdf.shape[0]] = [step, iatom, iatom+bond[0], jatom, ilabel+"-"+jlabel, d]
-                else: # jatom es el donor
-                    if compute_angle(frame, jatom, jatom+bond[1], iatom, lvs) > angle_cutoff:
-                        N_hbonds += 1
-                        d_ave += d
-                        hbondsdf.loc[hbondsdf.shape[0]] = [step, jatom, jatom+bond[1], iatom, jlabel+"-"+ilabel, d]
-                            
-    else:
-        dim = max(ihs, jhs) + 1
-        ds = 999.9*np.ones(dim)
-        
-        if jhs == 0:
-            for h in range(1, ihs+1):
-                ds[h] = compute_distance(frame, iatom+h, jatom, lvs)
-                # ds[h] = np.linalg.norm(frame[iatom+h] - frame[jatom]) # del h de iatom a jatom
-            for bond, d in enumerate(ds):
-                if d < distance_cutoff:
-                    if compute_angle(frame, iatom, iatom+bond, jatom, lvs) > angle_cutoff:
-                        N_hbonds += 1
-                        d_ave += d
-                        hbondsdf.loc[hbondsdf.shape[0]] = [step, iatom, iatom+bond, jatom, ilabel+"-"+jlabel, d]
-        else:
-            for h in range(1, jhs+1):
-                ds[h] = compute_distance(frame, iatom, jatom+h, lvs)
-                # ds[h] = np.linalg.norm(frame[iatom] - frame[jatom+h]) # de iatom al h de jatom
-            for bond, d in enumerate(ds):
-                if d < distance_cutoff:
-                    if compute_angle(frame, jatom, jatom+bond, iatom, lvs) > angle_cutoff:
-                        N_hbonds += 1
-                        d_ave += d
-                        hbondsdf.loc[hbondsdf.shape[0]] = [step, jatom, jatom+bond, iatom, jlabel+"-"+ilabel, d]
-    
-    return N_hbonds, d_ave
 #end
 
 
@@ -344,11 +248,11 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
         # Guardamos las estadísticas
         
         if N_hbonds != 0: d_ave = d_ave/N_hbonds
-        stats_dicts.append({'step': step, 'N_WATs': len(WATs), 'N_IONs': len(IONs), 'N_HBonds': N_hbonds, 'ave_dist': d_ave})
+        stats_dicts.append({'step': step, 'N_WATs': len(WATs), 'N_IONs': len(IONs), 'N_HBonds': N_hbonds, 'ave_dist': 10.0*d_ave})
     
     # Guardamos la información
     
-    pickle.dump(hbonds_G, open(label+'_hbondsG.txt', 'wb'))
+    pickle.dump(hbonds_G, open(label+'_hbondsG.dat', 'wb'))
     hbonds_df = pd.DataFrame(hbonds_dicts)
     hbonds_df.to_csv(label+"_hbonds.csv")
     stats_df = pd.DataFrame(stats_dicts)
