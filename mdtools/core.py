@@ -1,6 +1,7 @@
 ### IMPORTS ###
 
 
+import re
 import math
 import time
 import pickle
@@ -81,7 +82,10 @@ def recenter_traj_RMSD(run_name, N_tubes, N_res):
 #end
 
 
-class MyAtom:
+class MyAtom():
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+    
     def __init__(self, top, N_rings, N_res, index):
         atom = top.atom(index)
         self.index = index
@@ -94,6 +98,23 @@ class MyAtom:
         else:
             self.tube = None
             self.layer = None
+            
+    @classmethod
+    def from_string(cls, string):
+        regex = r"MyAtom\(index=(\d+), name=(\w+), resid=(\d+), resname=(\w+), tube=(\w+), layer=(\w+)\)"
+        result = re.search(regex, string)
+        myatom = cls.__new__(cls)
+        myatom.index = int(result.groups()[0])
+        myatom.name = result.groups()[1]
+        myatom.resid = int(result.groups()[2])
+        myatom.resname = result.groups()[3]
+        if result.groups()[4] == "None":
+            myatom.tube = None
+            myatom.layer = None
+        else:
+            myatom.tube = int(result.groups()[4])
+            myatom.layer = int(result.groups()[5])
+        return myatom
     
     def __str__(self): # print()
         return "MyAtom(index=" + str(self.index) + ", name=" + str(self.name) + ", resid=" + str(self.resid) + ", resname=" + str(self.resname) + ", tube=" + str(self.tube) + ", layer=" + str(self.layer) + ")"
