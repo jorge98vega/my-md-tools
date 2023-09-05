@@ -260,4 +260,41 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
 #end
 
 
+def detail_hbonds(label):
+    hbonds_df = pd.read_csv(label+"_hbonds.csv")
+    Nsteps = hbonds_df['step'].max()+1
+    
+    # Base de datos de los puentes de H del canal como una lista de diccionarios
+    # | Step | Donor | Acceptor | Número de puentes | Distancia media |
+    detail_dicts = []
+    
+    for step in range(Nsteps):
+        aux_df = hbonds_df[hbonds_df["step"] == step]
+        atoms = []
+        nhbonds = []
+        dists = []
+        for index, hbond in aux_df.iterrows():
+            donor = MyAtom.from_string(hbond['donor'])
+            acceptor = MyAtom.from_string(hbond['acceptor'])
+            atoms_dict = {'donor': donor.resname + "-" + re.sub(r'\d+', '', donor.name),
+                          'acceptor': acceptor.resname + "-" + re.sub(r'\d+', '', acceptor.name)}
+            if atoms_dict not in atoms:
+                atoms.append(atoms_dict)
+                nhbonds.append(1)
+                dists.append(hbond['d'])
+            else:
+                index = atoms.index(atoms_dict)
+                nhbonds[index] += 1
+                dists[index] += hbond['d']
+        for (pair, nhb, d) in zip(atoms, nhbonds, dists):
+            aux_dict = {'step': step, 'donor': pair['donor'], 'acceptor': pair['acceptor'],
+                        'N_HBonds': nhb, 'd': d/nhb}
+            detail_dicts.append(aux_dict)
+                
+    
+    detail_df = pd.DataFrame(detail_dicts)
+    detail_df.to_csv(label+"_detail.csv")
+#end
+
+
 ### EOF ###
