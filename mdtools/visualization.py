@@ -7,17 +7,82 @@ from mdtools.core import *
 ### VISUALIZATION ###
 
 
-def plot_CAs(traj, step):
+def plot_CAs(p, traj, step):
     frame = traj.slice(step, copy=False).xyz[0]
 
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.set_box_aspect((15, 15, 30))
 
-    CAs = traj.top.select("name CA")
-    for atom in CAs:
+    for atom in p.CAs:
+        xyz = frame[atom.index]
+        ax.scatter(xyz[0], xyz[1], xyz[2], c='grey')
+    for tube in range(p.N_tubes):
+        for ring in range(p.N_rings):
+            atoms = [atom.index for atom in p.CAs if atom.tube == tube and atom.layer == ring]
+            atoms.append(atoms[0])
+            for (atom1, atom2) in zip(atoms[:-1], atoms[1:]):
+                xyz1 = frame[atom1]
+                xyz2 = frame[atom2]
+                ax.plot3D([xyz1[0], xyz2[0]], [xyz1[1], xyz2[1]], [xyz1[2], xyz2[2]], color='grey', linewidth=1)
+#end
+
+
+def plot_region(p, traj, step, CAs, WATfile=None, layer=0, delta_r=0.0, delta_z=0.0, offsets=None, lvsunits=False):
+    frame = traj.slice(step, copy=False).xyz[0]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.set_box_aspect((15, 15, 30))
+
+    for atom in p.CAs:
+        xyz = frame[atom.index]
+        ax.scatter(xyz[0], xyz[1], xyz[2], c='grey')
+    for tube in range(p.N_tubes):
+        for ring in range(p.N_rings):
+            atoms = [atom.index for atom in p.CAs if atom.tube == tube and atom.layer == ring]
+            atoms.append(atoms[0])
+            for (atom1, atom2) in zip(atoms[:-1], atoms[1:]):
+                xyz1 = frame[atom1]
+                xyz2 = frame[atom2]
+                ax.plot3D([xyz1[0], xyz2[0]], [xyz1[1], xyz2[1]], [xyz1[2], xyz2[2]], color='grey', linewidth=1)
+        
+    if WATfile is None:
+        WATs = p.WATs
+    else:
+        iterWATs = np.load(WATfile+".npy", allow_pickle=True)
+        WATs = iterWATs[step]
+    for atom in WATs:
         xyz = frame[atom]
-        ax.scatter(xyz[0], xyz[1], xyz[2], c='k')
+        ax.scatter(xyz[0], xyz[1], xyz[2], c='r')
+    
+    atoms_top = get_indices_in_layer(CAs, layer)
+    atoms_bot = get_indices_in_layer(CAs, p.N_rings-layer-1)
+    # Centro de la región
+    centertop = np.sum(frame[atoms_top], axis=0)/atoms_top.size
+    centerbot = np.sum(frame[atoms_bot], axis=0)/atoms_bot.size
+    center = (centertop + centerbot)/2
+    # Radio de la región
+    rtop = np.max(distance_matrix(frame[atoms_top], frame[atoms_top]))
+    rbot = np.max(distance_matrix(frame[atoms_bot], frame[atoms_bot]))
+    r = max(rtop, rbot)/2 + delta_r
+    # Alturas máxima y mínima de la región
+    zmax = np.sum(frame[atoms_top][:,2])/atoms_top.size - center[2] + delta_z
+    zmin = np.sum(frame[atoms_bot][:,2])/atoms_bot.size - center[2] - delta_z
+    
+    # Plot cylinders
+    if offsets is None: offsets = [np.array([0.0, 0.0, 0.0])]
+    if lvsunits:
+        lvs = traj.slice(0, copy=False).unitcell_lengths[0]
+    else:
+        lvs = np.array([1.0, 1.0, 1.0])
+    for offset in offsets:
+        z = np.linspace(zmin + center[2] + offset[2]*lvs[2], zmax + center[2] + offset[2]*lvs[2], 50)
+        phi = np.linspace(0, 2*np.pi, 50)
+        phi_grid, z_grid = np.meshgrid(phi, z)
+        x_grid = r*np.cos(phi_grid) + center[0] + offset[0]*lvs[0]
+        y_grid = r*np.sin(phi_grid) + center[1] + offset[1]*lvs[1]
+        ax.plot_surface(x_grid, y_grid, z_grid, color='g', alpha=0.5)
 #end
 
 
@@ -39,7 +104,7 @@ def plot_network_3D(p, traj, step, label, reslist=[], ifpath=True, layer=0, xtal
 
     ###
     
-    if colordict is None: colordict = {'HOH-O': "r", 'LYS-N': "b", 'LYN-N': "g", 'TFA-O': "m", 'TFA-F': "k"}
+    if colordict is None: colordict = {'HOH-O': "r", 'LYS-N': "b", 'LYN-N': "y", 'TFA-O': "m", 'TFA-F': "k"}
     
     frame = traj.slice(step, copy=False).xyz[0]
     
