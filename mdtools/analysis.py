@@ -233,7 +233,21 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
         triplets, distances, presence = md.baker_hubbard(frame, periodic=xtal,
                                                          interesting_atoms=interesting_atoms, return_distances=True,
                                                          distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
-        for (donor, h, acceptor), d in zip(triplets[presence[0]], distances[0][presence[0]]):
+        
+        # Evitar el conteo doble
+        
+        ignore_indices = []
+        u, c = np.unique(triplets[presence[0]][:, 1], return_counts=True)
+        for duplicate in u[c > 1]:
+            indices, = np.where(triplets[presence[0]][:, 1] == duplicate) # índices en "triplets[presence[0]]", "distances[0]"
+            dmin_index = np.argmin(distances[0][presence[0]][indices]) # índice en "indices"
+            ignore_indices += [index for index in np.delete(indices, dmin_index)] # índices en "triplets[presence[0]]", "distances[0]"
+            
+        # Guardamos los hbonds
+        
+        for index, ((donor, h, acceptor), d) in enumerate(zip(triplets[presence[0]], distances[0][presence[0]])):
+            if index in ignore_indices:
+                continue
             if donor in b and acceptor in b:
                 continue
             if donor in backbone and acceptor in backbone:
