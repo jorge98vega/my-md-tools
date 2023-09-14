@@ -30,6 +30,7 @@ def plot_CAs(p, traj, step):
 
 def plot_region(p, traj, step, CAs, WATfile=None, layer=0, delta_r=0.0, delta_z=0.0, offsets=None, lvsunits=False):
     frame = traj.slice(step, copy=False).xyz[0]
+    lvs = traj.slice(0, copy=False).unitcell_lengths[0]
 
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -46,14 +47,14 @@ def plot_region(p, traj, step, CAs, WATfile=None, layer=0, delta_r=0.0, delta_z=
                 xyz1 = frame[atom1]
                 xyz2 = frame[atom2]
                 ax.plot3D([xyz1[0], xyz2[0]], [xyz1[1], xyz2[1]], [xyz1[2], xyz2[2]], color='grey', linewidth=1)
-        
+    
     if WATfile is None:
         WATs = p.WATs
     else:
         iterWATs = np.load(WATfile+".npy", allow_pickle=True)
         WATs = iterWATs[step]
     for atom in WATs:
-        xyz = frame[atom]
+        xyz = wrap_coordinates(frame[atom], lvs)
         ax.scatter(xyz[0], xyz[1], xyz[2], c='r')
     
     atoms_top = get_indices_in_layer(CAs, layer)
@@ -72,10 +73,7 @@ def plot_region(p, traj, step, CAs, WATfile=None, layer=0, delta_r=0.0, delta_z=
     
     # Plot cylinders
     if offsets is None: offsets = [np.array([0.0, 0.0, 0.0])]
-    if lvsunits:
-        lvs = traj.slice(0, copy=False).unitcell_lengths[0]
-    else:
-        lvs = np.array([1.0, 1.0, 1.0])
+    if not lvsunits: lvs = np.array([1.0, 1.0, 1.0])
     for offset in offsets:
         z = np.linspace(zmin + center[2] + offset[2]*lvs[2], zmax + center[2] + offset[2]*lvs[2], 50)
         phi = np.linspace(0, 2*np.pi, 50)
@@ -107,12 +105,12 @@ def plot_network_3D(p, traj, step, label, reslist=[], ifpath=True, layer=0, xtal
     if colordict is None: colordict = {'HOH-O': "r", 'LYS-N': "b", 'LYN-N': "y", 'TFA-O': "m", 'TFA-F': "k"}
     
     frame = traj.slice(step, copy=False).xyz[0]
+    lvs = traj.slice(0, copy=False).unitcell_lengths[0]
     
     if xtalcenter is None:
         xtal = False
     else:
         xtal = True
-    if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0]
 
     WATs = iterWATs[step]
     IONs = iterIONs[step]
@@ -137,7 +135,7 @@ def plot_network_3D(p, traj, step, label, reslist=[], ifpath=True, layer=0, xtal
         indices = [index for index, element in enumerate(resids) if element == resid]
         com = np.array([0.0,0.0,0.0])
         for index in indices:
-            com += frame[IONs[index]]
+            com = com + frame[IONs[index]]
         coms.append(com/len(indices))
     for index in IONs:
         atom = traj.top.atom(index)

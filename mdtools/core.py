@@ -210,6 +210,7 @@ def get_indices_between_layers(myatoms, firstlayer, lastlayer):
 
 
 def wrap_coordinates(point, box):
+    # De momento, solo para celdas ortoédricas...
     for dim in range(3):
         point[dim] = ((point[dim] + box[dim]/2) % box[dim]) - box[dim]/2
     

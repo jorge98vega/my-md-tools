@@ -151,19 +151,21 @@ def get_indices_xtal(traj, WATs, IONs, CAs, N_rings, delta_r=0.0, offsets=None, 
         aux = []
         for atom in WATs:
             for offset in offsets:
-                xyz = frame[atom] - (center + offset*lvs)
+                xyz = wrap_coordinates(frame[atom], lvs) - (center + offset*lvs)
                 if (xyz[0]**2+xyz[1]**2 < r**2):
                     aux.append(atom)
+                    break
         aux = np.array(aux)
         iterWATs.append(aux)
         
-        # Cloros en la región
+        # Iones en la región
         aux = []
         for atom in IONs:
             for offset in offsets:
-                xyz = frame[atom] - (center + offset*lvs)
+                xyz = wrap_coordinates(frame[atom], lvs) - (center + offset*lvs)
                 if (xyz[0]**2+xyz[1]**2 < r**2):
                     aux.append(atom)
+                    break
         aux = np.array(aux)
         iterIONs.append(aux)
     
