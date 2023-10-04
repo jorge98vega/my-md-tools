@@ -239,11 +239,11 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
         # Evitar el conteo doble
         
         ignore_indices = []
-        u, c = np.unique(triplets[presence[0]][:, 1], return_counts=True)
+        u, c = np.unique(triplets[presence[0]][:, 1], return_counts=True) 
         for duplicate in u[c > 1]:
-            indices, = np.where(triplets[presence[0]][:, 1] == duplicate) # índices en "triplets[presence[0]]", "distances[0]"
+            indices, = np.where(triplets[presence[0]][:, 1] == duplicate) # índices en "triplets[presence[0]][:,1]", "distances[0]"
             dmin_index = np.argmin(distances[0][presence[0]][indices]) # índice en "indices"
-            ignore_indices += [index for index in np.delete(indices, dmin_index)] # índices en "triplets[presence[0]]", "distances[0]"
+            ignore_indices += [index for index in np.delete(indices, dmin_index)] # índices en "triplets[presence[0]][:,1]", "distances[0]"
             
         # Guardamos los hbonds
         
@@ -256,7 +256,7 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
                 continue
             mydonor = MyAtom(traj.top, p.N_rings, p.N_res, donor)
             myacceptor = MyAtom(traj.top, p.N_rings, p.N_res, acceptor)
-            hbonds_G.add_edge(mydonor, myacceptor, step=step, h=h, d=10.0*d)
+            hbonds_G.add_edge(donor, acceptor, step=step, h=h, d=10.0*d)
             hbonds_dicts.append({'step': step, 'donor': mydonor, 'h': h, 'acceptor': myacceptor, 'd': 10.0*d})
             N_hbonds += 1
             d_ave += d
@@ -310,6 +310,71 @@ def detail_hbonds(label):
     
     detail_df = pd.DataFrame(detail_dicts)
     detail_df.to_csv(label+"_detail.csv")
+#end
+
+
+def search_longestpaths(traj, label, xtal=False, first=None, last=None):
+    hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
+    if first is None: first = 0
+    if last is None: last = len(traj)
+       
+    paths_dicts = []
+    for step in range(first, last):
+        frame = traj.slice(step, copy=False).xyz[0]
+        if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0]
+        auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
+        paths = dict(nx.all_pairs_shortest_path(auxG))
+        longest_path = {'step': step, 'path': [], 'dz': 0.0}
+        for node1 in paths:
+            for node2 in paths[node1]:
+                if xtal:
+                    path = paths[node1][node2]
+                    totaldz = 0.0
+                    for i in range(len(path)-1):
+                        dz = 10.0*(frame[path[i+1]][2] - frame[path[i]][2])
+                        if abs(dz) > 10.0*lvs[2]/2: dz = dz - np.sign(dz)*10.0*lvs[2]
+                        totaldz += dz
+                    dz = totaldz
+                else:
+                    dz = 10.0*(frame[node2][2] - frame[node1][2])
+                if abs(dz) > abs(longest_path['dz']):
+                    longest_path['path'] = paths[node1][node2]
+                    longest_path['dz'] = dz
+        paths_dicts.append(longest_path)
+    
+    paths_df = pd.DataFrame(paths_dicts)
+    paths_df.to_csv(label+"_longestpaths.csv")
+#end
+
+
+def search_paths_res(traj, label, resnamelist, first=None, last=None):
+    def search_neighbors_res(G, nodes, resnamelist, path, paths_dicts):
+        if len(resnamelist) == 0:
+            paths_dicts.append({'step': step, 'path': path})
+            return
+        for node in nodes:
+            if traj.top.atom(node).residue.name != resnamelist[0]: continue
+            path.append(node)
+            neighbors = G.neighbors(node)
+            search_neighbors_res(G, neighbors, resnamelist[1:], path, paths_dicts)
+    
+    
+    hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
+    if first is None: first = 0
+    if last is None: last = len(traj)
+    reslabel = ""
+    for resname in resnamelist: reslabel += resname + "-"
+    reslabel = reslabel[:-1]
+    
+    paths_dicts = []
+    for step in range(first, last):
+        frame = traj.slice(step, copy=False).xyz[0]
+        auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
+        nodes = list(auxG.nodes)
+        search_neighbors_res(auxG, nodes, resnamelist, [], path_dicts)
+    
+    paths_df = pd.DataFrame(paths_dicts)
+    paths_df.to_csv(label+"_paths"+reslabel+".csv")
 #end
 
 

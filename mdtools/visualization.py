@@ -94,8 +94,8 @@ def plot_network_3D(p, traj, step, label, reslist=[], ifpath=True, layer=0, xtal
 
     hbonds = pd.read_csv(label+"_hbonds.csv")
     if ifpath:
-        if os.path.isfile(label+"_paths.csv"):
-            paths = pd.read_csv(label+"_paths.csv")
+        if os.path.isfile(label+"_longestpaths.csv"):
+            paths = pd.read_csv(label+"_longestpaths.csv")
             paths['path'] = paths['path'].apply(lambda x: np.array([int(i) for i in x[1:-1].split(",")]))
         else:
             ifpath = False
@@ -148,10 +148,10 @@ def plot_network_3D(p, traj, step, label, reslist=[], ifpath=True, layer=0, xtal
         if xtal: com = wrap_coordinates(com - xtalcenter*lvs, lvs)
         if xtal and (np.abs(com[2] - xyz[2]) > lvs[2]/2):
             case = np.sign(com[2] - xyz[2])
-            ax.plot3D([xyz[0], com[0]], [xyz[1], com[1]], [xyz[2]+case*lvs[2], com[2]], color="grey", linewidth=1)
-            ax.plot3D([xyz[0], com[0]], [xyz[1], com[1]], [xyz[2], com[2]-case*lvs[2]], color="grey", linewidth=1)
+            ax.plot3D([xyz[0], com[0]], [xyz[1], com[1]], [xyz[2]+case*lvs[2], com[2]], color="grey", linestyle=":", linewidth=1)
+            ax.plot3D([xyz[0], com[0]], [xyz[1], com[1]], [xyz[2], com[2]-case*lvs[2]], color="grey", linestyle=":", linewidth=1)
         else:
-            ax.plot3D([xyz[0], com[0]], [xyz[1], com[1]], [xyz[2], com[2]], color="grey", linewidth=1)
+            ax.plot3D([xyz[0], com[0]], [xyz[1], com[1]], [xyz[2], com[2]], color="grey", linestyle=":", linewidth=1)
         
     bondable_atoms = get_atoms_in_reslist(p.bondable, reslist)
     bondable = get_indices_between_layers(bondable_atoms, layer, p.N_rings-layer-1)
@@ -179,9 +179,9 @@ def plot_network_3D(p, traj, step, label, reslist=[], ifpath=True, layer=0, xtal
         for i in range(len(path)-1):
             xyz1 = frame[abs(path[i])]
             if xtal: xyz1 = wrap_coordinates(xyz1 - xtalcenter*lvs, lvs)
-            if xtal and (np.sign(path[i]) != np.sign(path[i+1])):
-                xyz2 = frame[abs(path[i+1])]
-                xyz2 = wrap_coordinates(xyz2 - xtalcenter*lvs, lvs)
+            xyz2 = frame[abs(path[i+1])]
+            if xtal: xyz2 = wrap_coordinates(xyz2 - xtalcenter*lvs, lvs)
+            if xtal and (np.abs(xyz2[2] - xyz1[2]) > lvs[2]/2):
                 case = np.sign(xyz2[2] - xyz1[2])
                 ax.plot3D([xyz1[0], xyz2[0]], [xyz1[1], xyz2[1]], [xyz1[2]+case*lvs[2], xyz2[2]], 'k--', linewidth=2.5)
                 ax.plot3D([xyz1[0], xyz2[0]], [xyz1[1], xyz2[1]], [xyz1[2], xyz2[2]-case*lvs[2]], 'k--', linewidth=2.5)
