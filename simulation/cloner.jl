@@ -11,7 +11,15 @@ include("cloner.in")
 Ntotal = Nrings*Natoms # Number of atoms in the system
 
 
-function clon(file, names, resnames, resids, pos, com, t, n)
+function rotate(pos, center, alpha)
+    rotmat = [cos(alpha) -sin(alpha) 0
+              sin(alpha) cos(alpha)  0
+              0          0           1]
+    return rotmat*(pos - center) + center
+end
+
+
+function clon(file, names, resnames, resids, pos, com, t, alpha, n)
     for ring in 0:Nrings-1
         for atom in 1:Natoms
 	    index = ring*Natoms + atom
@@ -21,7 +29,9 @@ function clon(file, names, resnames, resids, pos, com, t, n)
 	    print(file, atid, "  ", names[index], repeat(" ", 4-length(names[index])))
 	    print(file, resnames[index], repeat(" ", 6-length(string(resid))))
 	    print(file, resid, "    ")
-	    newpos = pos[3*(index-1) .+ (1:3)] + t
+	    rotpos = rotate(pos[3*(index-1) .+ (1:3)], com, alpha)
+	    newpos = rotpos + t
+	    # newpos = pos[3*(index-1) .+ (1:3)] + t
 	    for dim in 1:3
 	        print(file, repeat(" ", 8-length(@sprintf("%.3f", newpos[dim]))))
 	        @printf(file, "%.3f", newpos[dim])
@@ -64,7 +74,8 @@ function main()
     open(newfile, "w") do file
         print(file, "\n")
 	for n in 1:size(ts)[1]
-	    clon(file, names, resnames, resids, pos, com, ts[n, :], n)
+	    clon(file, names, resnames, resids, pos, com,
+		 ts[n, :], as[n]*pi/180, n)
 	end
 	println(file, "END   ")
     end
