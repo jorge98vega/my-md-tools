@@ -354,9 +354,10 @@ def search_paths_res(traj, label, resnamelist, first=None, last=None):
             return
         for node in nodes:
             if traj.top.atom(node).residue.name != resnamelist[0]: continue
-            path.append(node)
+            aux_path = path.copy()
+            aux_path.append(node)
             neighbors = G.neighbors(node)
-            search_neighbors_res(G, neighbors, resnamelist[1:], path, paths_dicts)
+            search_neighbors_res(G, neighbors, resnamelist[1:], aux_path, paths_dicts)
     
     
     hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
@@ -371,7 +372,7 @@ def search_paths_res(traj, label, resnamelist, first=None, last=None):
         frame = traj.slice(step, copy=False).xyz[0]
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
         nodes = list(auxG.nodes)
-        search_neighbors_res(auxG, nodes, resnamelist, [], path_dicts)
+        search_neighbors_res(auxG, nodes, resnamelist, [], paths_dicts)
     
     paths_df = pd.DataFrame(paths_dicts)
     paths_df.to_csv(label+"_paths"+reslabel+".csv")
