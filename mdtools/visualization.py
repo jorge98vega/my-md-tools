@@ -28,7 +28,7 @@ def plot_CAs(p, traj, step):
 #end
 
 
-def plot_region(p, traj, step, CAs, WATfile=None, layer=0, delta_r=0.0, delta_z=0.0, offsets=None, lvsunits=False):
+def plot_region(p, traj, step, CAs, WATfile=None, layer=0, delta_r=0.0, delta_z=0.0, offsets=None, lvsunits=False, wrap=False):
     frame = traj.slice(step, copy=False).xyz[0]
     lvs = traj.slice(0, copy=False).unitcell_lengths[0]
 
@@ -54,7 +54,10 @@ def plot_region(p, traj, step, CAs, WATfile=None, layer=0, delta_r=0.0, delta_z=
         iterWATs = np.load(WATfile+".npy", allow_pickle=True)
         WATs = iterWATs[step]
     for atom in WATs:
-        xyz = wrap_coordinates(frame[atom], lvs)
+        if wrap:
+            xyz = wrap_coordinates(frame[atom], lvs)
+        else:
+            xyz = frame[atom]
         ax.scatter(xyz[0], xyz[1], xyz[2], c='r')
     
     atoms_top = get_indices_in_layer(CAs, layer)
