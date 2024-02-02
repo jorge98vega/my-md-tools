@@ -324,7 +324,7 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
         if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0]
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
         paths = dict(nx.all_pairs_shortest_path(auxG))
-        longest_path = {'step': step, 'path': [], 'dz': 0.0}
+        longest_path = {'step': step, 'path': [], 'residues': [], 'dz': 0.0}
         for node1 in paths:
             for node2 in paths[node1]:
                 if xtal:
@@ -339,6 +339,7 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
                     dz = 10.0*(frame[node2][2] - frame[node1][2])
                 if abs(dz) > abs(longest_path['dz']):
                     longest_path['path'] = paths[node1][node2]
+                    longest_path['residues'] = [traj.top.atom(node).residue.name for node in paths[node1][node2]]
                     longest_path['dz'] = dz
         paths_dicts.append(longest_path)
     
@@ -375,7 +376,7 @@ def search_paths_res(traj, label, resnamelist, first=None, last=None):
         search_neighbors_res(auxG, nodes, resnamelist, [], paths_dicts)
     
     paths_df = pd.DataFrame(paths_dicts)
-    paths_df.to_csv(label+"_paths"+reslabel+".csv")
+    paths_df.to_csv(label+"_paths_"+reslabel+".csv")
 #end
 
 
