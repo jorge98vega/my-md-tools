@@ -1,6 +1,6 @@
 # use with VMD something like this:
 # vmd -e view-waters.tcl -args iWATs_canal.dat 4990 5000
-# diubja los frames desde 4990 hasta 4999
+# dibuja los frames desde 4990 hasta 4999
 # (recuerda que los frames comienzan en 0)
 # customize representations to taste
 # info: http://www.theochem.ruhr-uni-bochum.de/~legacy.akohlmey/cpmd-vmd/part4.html

@@ -8,7 +8,7 @@ from mdtools.core import *
 
 
 def get_indices(traj, WATs, IONs, CAs, N_rings, layer=0, boundary=None,
-                delta=1.0, delta_r=None, delta_z=None, offset=None,
+                delta=0.1, delta_r=None, delta_z=None, offset=None,
                 preselected=False, save=True, savefileWATs="iterWATs", savefileIONs="iterIONs", first=None, last=None):
     
     # layer y boundary son el número de anillos que se excluyen de sus respectivas zonas:
