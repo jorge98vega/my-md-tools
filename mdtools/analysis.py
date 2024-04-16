@@ -317,38 +317,58 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
     hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
     if first is None: first = 0
     if last is None: last = len(traj)
-       
+
     paths_dicts = []
     for step in range(first, last):
         frame = traj.slice(step, copy=False).xyz[0]
-        if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0]
+        if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0] # nm
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
-        paths = dict(nx.all_pairs_shortest_path(auxG))
         longest_path = {'step': step, 'path': [], 'residues': [], 'dz': 0.0}
+
+        # Paths
+        paths = dict(nx.all_pairs_shortest_path(auxG))
         for node1 in paths:
             for node2 in paths[node1]:
+                path = paths[node1][node2]
                 if xtal:
-                    path = paths[node1][node2]
                     totaldz = 0.0
                     for i in range(len(path)-1):
-                        dz = 10.0*(frame[path[i+1]][2] - frame[path[i]][2])
+                        dz = 10.0*(frame[path[i+1]][2] - frame[path[i]][2]) # Å
                         if abs(dz) > 10.0*lvs[2]/2: dz = dz - np.sign(dz)*10.0*lvs[2]
                         totaldz += dz
                     dz = totaldz
                 else:
                     dz = 10.0*(frame[node2][2] - frame[node1][2])
                 if abs(dz) > abs(longest_path['dz']):
-                    longest_path['path'] = paths[node1][node2]
-                    longest_path['residues'] = [traj.top.atom(node).residue.name for node in paths[node1][node2]]
+                    longest_path['path'] = path
+                    longest_path['residues'] = [traj.top.atom(node).residue.name for node in path]
                     longest_path['dz'] = dz
+
+        # Cycles
+        if xtal:
+            cycles = sorted(nx.simple_cycles(auxG))
+            for cycle in cycles:
+                cycle.append(cycle[0])
+                totaldz = 0.0
+                for i in range(len(cycle)-1):
+                    dz = 10.0*(frame[cycle[i+1]][2] - frame[cycle[i]][2]) # Å
+                    if abs(dz) > 10.0*lvs[2]/2: dz = dz - np.sign(dz)*10.0*lvs[2]
+                    totaldz += dz
+                dz = totaldz
+                if abs(dz) > abs(longest_path['dz']):
+                    longest_path['path'] = cycle
+                    longest_path['residues'] = [traj.top.atom(node).residue.name for node in cycle]
+                    longest_path['dz'] = dz
+
         paths_dicts.append(longest_path)
-    
+        
     paths_df = pd.DataFrame(paths_dicts)
     paths_df.to_csv(label+"_longestpaths.csv")
 #end
 
 
 def search_paths_res(traj, label, resnamelist, first=None, last=None):
+    
     def search_neighbors_res(G, nodes, resnamelist, path, paths_dicts):
         if len(resnamelist) == 0:
             paths_dicts.append({'step': step, 'path': path})
@@ -359,7 +379,6 @@ def search_paths_res(traj, label, resnamelist, first=None, last=None):
             aux_path.append(node)
             neighbors = G.neighbors(node)
             search_neighbors_res(G, neighbors, resnamelist[1:], aux_path, paths_dicts)
-    
     
     hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
     if first is None: first = 0
