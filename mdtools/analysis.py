@@ -318,16 +318,23 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
     if first is None: first = 0
     if last is None: last = len(traj)
 
-    paths_dicts = []
+    cluster_dicts = []
+    path_dicts = []
     for step in range(first, last):
         frame = traj.slice(step, copy=False).xyz[0]
         if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0] # nm
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
+        largest_cluster = {'step': step, 'nodes': [], 'residues': [], 'size': 0.0, 'ratio': 0.0}
         longest_path = {'step': step, 'path': [], 'residues': [], 'dz': 0.0}
 
         # Paths
         paths = dict(nx.all_pairs_shortest_path(auxG))
         for node1 in paths:
+            # Clusters
+            cluster_size = len(paths[node1])
+            if cluster_size > largest_cluster['size']:
+                largest_cluster['nodes'] = list(paths[node1].keys())
+                largest_cluster['size'] = cluster_size
             for node2 in paths[node1]:
                 path = paths[node1][node2]
                 if xtal:
@@ -341,7 +348,6 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
                     dz = 10.0*(frame[node2][2] - frame[node1][2])
                 if abs(dz) > abs(longest_path['dz']):
                     longest_path['path'] = path
-                    longest_path['residues'] = [traj.top.atom(node).residue.name for node in path]
                     longest_path['dz'] = dz
 
         # Cycles
@@ -357,28 +363,33 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
                 dz = totaldz
                 if abs(dz) > abs(longest_path['dz']):
                     longest_path['path'] = cycle
-                    longest_path['residues'] = [traj.top.atom(node).residue.name for node in cycle]
                     longest_path['dz'] = dz
-
-        paths_dicts.append(longest_path)
         
-    paths_df = pd.DataFrame(paths_dicts)
-    paths_df.to_csv(label+"_longestpaths.csv")
+        largest_cluster['ratio'] = largest_cluster['size']/auxG.number_of_nodes()
+        largest_cluster['residues'] = [traj.top.atom(node).residue.name for node in largest_cluster['nodes']]
+        longest_path['residues'] = [traj.top.atom(node).residue.name for node in longest_path['path']]
+        cluster_dicts.append(largest_cluster)
+        path_dicts.append(longest_path)
+        
+    cluster_df = pd.DataFrame(cluster_dicts)
+    path_df = pd.DataFrame(path_dicts)
+    cluster_df.to_csv(label+"_largestclusters.csv")
+    path_df.to_csv(label+"_longestpaths.csv")
 #end
 
 
 def search_paths_res(traj, label, resnamelist, first=None, last=None):
     
-    def search_neighbors_res(G, nodes, resnamelist, path, paths_dicts):
+    def search_neighbors_res(G, nodes, resnamelist, path, path_dicts):
         if len(resnamelist) == 0:
-            paths_dicts.append({'step': step, 'path': path})
+            path_dicts.append({'step': step, 'path': path})
             return
         for node in nodes:
             if traj.top.atom(node).residue.name != resnamelist[0]: continue
             aux_path = path.copy()
             aux_path.append(node)
             neighbors = G.neighbors(node)
-            search_neighbors_res(G, neighbors, resnamelist[1:], aux_path, paths_dicts)
+            search_neighbors_res(G, neighbors, resnamelist[1:], aux_path, path_dicts)
     
     hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
     if first is None: first = 0
@@ -387,15 +398,15 @@ def search_paths_res(traj, label, resnamelist, first=None, last=None):
     for resname in resnamelist: reslabel += resname + "-"
     reslabel = reslabel[:-1]
     
-    paths_dicts = []
+    path_dicts = []
     for step in range(first, last):
         frame = traj.slice(step, copy=False).xyz[0]
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
         nodes = list(auxG.nodes)
-        search_neighbors_res(auxG, nodes, resnamelist, [], paths_dicts)
+        search_neighbors_res(auxG, nodes, resnamelist, [], path_dicts)
     
-    paths_df = pd.DataFrame(paths_dicts)
-    paths_df.to_csv(label+"_paths_"+reslabel+".csv")
+    path_df = pd.DataFrame(path_dicts)
+    path_df.to_csv(label+"_paths_"+reslabel+".csv")
 #end
 
 
