@@ -325,7 +325,7 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
         if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0] # nm
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
         largest_cluster = {'step': step, 'nodes': [], 'residues': [], 'size': 0.0, 'ratio': 0.0}
-        longest_path = {'step': step, 'path': [], 'residues': [], 'dz': 0.0}
+        longest_path = {'step': step, 'path': [], 'residues': [], 'dz': 0.0, 'ratio': 0.0}
 
         # Paths
         paths = dict(nx.all_pairs_shortest_path(auxG))
@@ -364,13 +364,15 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
                 if abs(dz) > abs(longest_path['dz']):
                     longest_path['path'] = cycle
                     longest_path['dz'] = dz
-        
+
         largest_cluster['ratio'] = largest_cluster['size']/auxG.number_of_nodes()
         largest_cluster['residues'] = [traj.top.atom(node).residue.name for node in largest_cluster['nodes']]
+        longest_path['ratio'] = min(1.0, np.abs(longest_path['dz']/(10.0*lvs[2])))
         longest_path['residues'] = [traj.top.atom(node).residue.name for node in longest_path['path']]
+
         cluster_dicts.append(largest_cluster)
         path_dicts.append(longest_path)
-        
+
     cluster_df = pd.DataFrame(cluster_dicts)
     path_df = pd.DataFrame(path_dicts)
     cluster_df.to_csv(label+"_largestclusters.csv")
@@ -407,6 +409,63 @@ def search_paths_res(traj, label, resnamelist, first=None, last=None):
     
     path_df = pd.DataFrame(path_dicts)
     path_df.to_csv(label+"_paths_"+reslabel+".csv")
+#end
+
+
+def water_channel_stability(traj, regex="iterWATs_channel*.npy", width=100, model="l2", dz=2.5, method="onebyone", first=None, last=None, savefile="water_stability.csv"):
+    # dz in Angstrom
+
+    def get_filepaths_with_glob(root_path: str, file_regex: str):
+        return glob.glob(os.path.join(root_path, file_regex))
+
+    def custom_search(algo, zs, dz, method):
+        order = max(max(algo.width, 2 * algo.min_size) // (2 * algo.jump), 1)
+        peak_inds_shifted = argrelmax(algo.score, order=order, mode="wrap")[0]
+        peak_inds_arr = np.take(algo.inds, peak_inds_shifted)
+        peak_inds = [0] + list(peak_inds_arr) + [algo.n_samples]
+
+        while True:
+            avs = []
+            for ipeak in range(len(peak_inds)-1):
+                i = peak_inds[ipeak]
+                j = peak_inds[ipeak+1]
+                avs.append(zs[i:j].mean())
+
+            davs = np.abs(np.array(avs[:-1]) - np.array(avs[1:]))
+            if method == "onebyone":
+                conditions = np.ones(len(peak_inds), dtype=bool)
+                if len(davs) > 0 and np.min(davs) < dz: conditions[np.argmin(davs)+1] = False
+            elif method == "direct":
+                conditions = np.array([True] + list(davs > dz) + [True])
+            else:
+                print("Error: method must be 'onebyone' or 'direct'")
+                return
+
+            if all(conditions): break
+            peak_inds = [peak for (peak, cond) in zip(peak_inds, conditions) if cond]
+        return peak_inds[1:]
+
+    if first is None: first = 0
+    if last is None: last = len(traj)
+    dz = 0.1*dz # A to nm
+
+    files = get_filepaths_with_glob(".", regex)
+    WATs_channels = []
+    for fileWATs in files:
+        iterWATs = np.load(fileWATs, allow_pickle=True)
+        WATs_channels += list(iterWATs[first]) # only waters in first frame
+    WATs_channels = np.unique(np.array(WATs_channels))
+
+    stab_dicts = []
+    for atom in WATs_channels:
+        zs = np.array([traj.slice(step, copy=False).xyz[0][atom][2] for step in range(first, last)])
+        algo = rpt.Window(width=width, model=model).fit(zs)
+        bkps = custom_search(algo, zs, dz, method) # change points
+        intervals = [bkps[0]] + [bkps[i+1] - bkps[i] for i in range(len(bkps)-1)] # water stability duration
+        stab_dicts.append({'index': atom, 'bkps': bkps, 'intervals': intervals})
+
+    stab_df = pd.DataFrame(stab_dicts)
+    stab_df.to_csv(savefile)
 #end
 
 

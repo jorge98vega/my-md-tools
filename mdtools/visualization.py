@@ -402,4 +402,43 @@ def plot_density_profiles(p, traj, label, first, last, canal=True, tube=0, Nbins
 #end
 
 
+def plot_water_stability(traj, file="water_stability.csv", index=None, figsize=(12, 6)):
+    stab_df = pd.read_csv(file)
+
+    indices = stab_df['index'].tolist()
+    if index is None:
+        index = indices[np.random.randint(len(indices))]
+    else:
+        if not index in indices:
+            print("Error: index not present in file")
+            return
+
+    row = stab_df[stab_df['index'] == index]
+    field = row['bkps']
+    data = field[field.index[0]]
+    bkps = [0] + json.loads(data)
+
+    zs = np.array([traj.slice(step, copy=False).xyz[0][index][2] for step in range(len(traj))])
+    window_size = 100 # del rolling average
+    zseries = pd.Series(zs)
+    windows = zseries.rolling(window_size, center=True)
+    rolling_averages = windows.mean()
+    zra = np.array(rolling_averages.tolist())
+
+    rpt.display(zs, bkps, figsize=figsize)
+    plt.plot(zra, 'r', lw=3)
+
+    for ibkp in range(len(bkps)-1):
+        i = bkps[ibkp]
+        j = bkps[ibkp+1]
+        plt.plot([i, j], [zs[i:j].mean(), zs[i:j].mean()], 'k--', lw=3)
+
+    plt.xlim([bkps[0], bkps[-1]])
+    plt.title("index = " + str(index))
+    plt.xlabel("Step")
+    plt.ylabel("z (nm)")
+    return index
+#end
+
+
 ### EOF ###
