@@ -314,6 +314,11 @@ def detail_hbonds(label):
 
 
 def search_longestpaths(traj, label, xtal=False, first=None, last=None):
+
+    def wrap(dz, lvsz):
+        wrapped_dz = ((dz + lvsz/2) % lvsz) - lvsz/2
+        return wrapped_dz
+
     hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
     if first is None: first = 0
     if last is None: last = len(traj)
@@ -341,7 +346,7 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
                     totaldz = 0.0
                     for i in range(len(path)-1):
                         dz = 10.0*(frame[path[i+1]][2] - frame[path[i]][2]) # Å
-                        if abs(dz) > 10.0*lvs[2]/2: dz = dz - np.sign(dz)*10.0*lvs[2]
+                        if abs(dz) > 10.0*lvs[2]/2: dz = wrap(dz, 10*lvs[2])
                         totaldz += dz
                     dz = totaldz
                 else:
@@ -358,7 +363,7 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
                 totaldz = 0.0
                 for i in range(len(cycle)-1):
                     dz = 10.0*(frame[cycle[i+1]][2] - frame[cycle[i]][2]) # Å
-                    if abs(dz) > 10.0*lvs[2]/2: dz = dz - np.sign(dz)*10.0*lvs[2]
+                    if abs(dz) > 10.0*lvs[2]/2: dz = wrap(dz, 10*lvs[2])
                     totaldz += dz
                 dz = totaldz
                 if abs(dz) > abs(longest_path['dz']):
