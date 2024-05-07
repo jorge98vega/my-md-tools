@@ -313,7 +313,7 @@ def detail_hbonds(label):
 #end
 
 
-def search_longestpaths(traj, label, xtal=False, first=None, last=None):
+def search_longestpaths(traj, label, xtal=False, first=None, last=None, update=1000):
 
     def wrap(dz, lvsz):
         wrapped_dz = ((dz + lvsz/2) % lvsz) - lvsz/2
@@ -322,14 +322,20 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
     hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
     if first is None: first = 0
     if last is None: last = len(traj)
+    start = time.time()
 
     cluster_dicts = []
     path_dicts = []
     for step in range(first, last):
+        if step%update == 0:
+            stop = time.time()
+            print(step, stop-start, "s")
+            start = stop
+
         frame = traj.slice(step, copy=False).xyz[0]
         if xtal: lvs = traj.slice(0, copy=False).unitcell_lengths[0] # nm
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
-        largest_cluster = {'step': step, 'nodes': [], 'residues': [], 'size': 0.0, 'ratio': 0.0}
+        largest_cluster = {'step': step, 'nodes': [], 'residues': [], 'size': 0.0, 'ratio': 0.0, 'nratio': 0.0, 'percolating': 0}
         longest_path = {'step': step, 'path': [], 'residues': [], 'dz': 0.0, 'ratio': 0.0}
 
         # Paths
@@ -369,13 +375,20 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
                 if abs(dz) > abs(longest_path['dz']):
                     longest_path['path'] = cycle
                     longest_path['dz'] = dz
+                    if abs(dz) >= 10*lvs[2]:
+                        # stop after finding the first "percolating" cycle
+                        largest_cluster['percolating'] = 1
+                        break
 
         largest_cluster['ratio'] = largest_cluster['size']/auxG.number_of_nodes()
+        source = largest_cluster['nodes'][0]
+        reachable_nodes = len([n for n in list(auxG.nodes) if traj.top.atom(n).residue.name != 'LYS']) + int(traj.top.atom(source).residue.name == 'LYS')
+        largest_cluster['nratio'] = largest_cluster['size']/reachable_nodes
         largest_cluster['residues'] = [traj.top.atom(node).residue.name for node in largest_cluster['nodes']]
-        longest_path['ratio'] = min(1.0, np.abs(longest_path['dz']/(10.0*lvs[2])))
-        longest_path['residues'] = [traj.top.atom(node).residue.name for node in longest_path['path']]
-
         cluster_dicts.append(largest_cluster)
+
+        if xtal: longest_path['ratio'] = np.abs(longest_path['dz']/(10.0*lvs[2]))
+        longest_path['residues'] = [traj.top.atom(node).residue.name for node in longest_path['path']]
         path_dicts.append(longest_path)
 
     cluster_df = pd.DataFrame(cluster_dicts)
@@ -386,7 +399,7 @@ def search_longestpaths(traj, label, xtal=False, first=None, last=None):
 
 
 def search_paths_res(traj, label, resnamelist, first=None, last=None):
-    
+
     def search_neighbors_res(G, nodes, resnamelist, path, path_dicts):
         if len(resnamelist) == 0:
             path_dicts.append({'step': step, 'path': path})
@@ -397,21 +410,21 @@ def search_paths_res(traj, label, resnamelist, first=None, last=None):
             aux_path.append(node)
             neighbors = G.neighbors(node)
             search_neighbors_res(G, neighbors, resnamelist[1:], aux_path, path_dicts)
-    
+
     hbondsG = pickle.load(open(label + '_hbondsG.dat', 'rb'))
     if first is None: first = 0
     if last is None: last = len(traj)
     reslabel = ""
     for resname in resnamelist: reslabel += resname + "-"
     reslabel = reslabel[:-1]
-    
+
     path_dicts = []
     for step in range(first, last):
         frame = traj.slice(step, copy=False).xyz[0]
         auxG = nx.MultiDiGraph(((u,v,d) for u,v,d in hbondsG.edges(data=True) if d['step'] == step))
         nodes = list(auxG.nodes)
         search_neighbors_res(auxG, nodes, resnamelist, [], path_dicts)
-    
+
     path_df = pd.DataFrame(path_dicts)
     path_df.to_csv(label+"_paths_"+reslabel+".csv")
 #end
