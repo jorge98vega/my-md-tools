@@ -425,19 +425,19 @@ def plot_water_stability(traj, file="water_stability.csv", index=None, figsize=(
     rolling_averages = windows.mean()
     zra = np.array(rolling_averages.tolist())
 
-    rpt.display(zs, bkps, figsize=figsize)
-    plt.plot(zra, 'r', lw=3)
+    fig, axs = rpt.display(zs, bkps, figsize=figsize)
+    axs[0].plot(zra, 'r', lw=3)
 
     for ibkp in range(len(bkps)-1):
         i = bkps[ibkp]
         j = bkps[ibkp+1]
-        plt.plot([i, j], [zs[i:j].mean(), zs[i:j].mean()], 'k--', lw=3)
+        axs[0].plot([i, j], [zs[i:j].mean(), zs[i:j].mean()], 'k--', lw=3)
 
-    plt.xlim([bkps[0], bkps[-1]])
-    plt.title("index = " + str(index))
-    plt.xlabel("Step")
-    plt.ylabel("z (nm)")
-    return index
+    axs[0].set_xlim([bkps[0], bkps[-1]])
+    axs[0].set_title("index = " + str(index))
+    axs[0].set_xlabel("Step")
+    axs[0].set_ylabel("z (nm)")
+    return fig, axs, index
 #end
 
 
