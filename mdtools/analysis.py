@@ -207,7 +207,7 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
     stats_dicts = []
     
     # Base de datos de los puentes de hidrógeno como una lista de diccionarios - complementario al grafo (abajo)
-    # | Step | Donor | Hydrogen | Acceptor | Distance |
+    # | Step | Donor | Hydrogen | Acceptor | Distance | Angle |
     hbonds_dicts = []
     
     # Grafo los puentes de H
@@ -232,8 +232,8 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
         # Buscamos los puentes de H del frame
         
         interesting_atoms = np.concatenate((WATs, IONs, bondable, backbone, b))
-        triplets, distances, presence = md.baker_hubbard(frame, periodic=xtal,
-                                                         interesting_atoms=interesting_atoms, return_distances=True,
+        triplets, distances, angles, presence = md.baker_hubbard(frame, periodic=xtal,
+                                                         interesting_atoms=interesting_atoms, return_geometry=True,
                                                          distance_cutoff=0.1*distance_cutoff, angle_cutoff=angle_cutoff)
         
         # Evitar el conteo doble
@@ -247,7 +247,7 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
             
         # Guardamos los hbonds
         
-        for index, ((donor, h, acceptor), d) in enumerate(zip(triplets[presence[0]], distances[0][presence[0]])):
+        for index, ((donor, h, acceptor), d, theta) in enumerate(zip(triplets[presence[0]], distances[0][presence[0]], angles[0][presence[0]])):
             if index in ignore_indices:
                 continue
             if donor in b and acceptor in b:
@@ -257,7 +257,7 @@ def analyse(p, traj, label, reslist=[], layer=0, boundary=None,
             mydonor = MyAtom(traj.top, p.N_rings, p.N_res, donor)
             myacceptor = MyAtom(traj.top, p.N_rings, p.N_res, acceptor)
             hbonds_G.add_edge(donor, acceptor, step=step, h=h, d=10.0*d)
-            hbonds_dicts.append({'step': step, 'donor': mydonor, 'h': h, 'acceptor': myacceptor, 'd': 10.0*d})
+            hbonds_dicts.append({'step': step, 'donor': mydonor, 'h': h, 'acceptor': myacceptor, 'd': 10.0*d, 'theta': theta*180.0/np.pi})
             N_hbonds += 1
             d_ave += d
             

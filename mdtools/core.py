@@ -23,7 +23,6 @@ import matplotlib.path as mpath
 import matplotlib.collections as mcoll
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.mplot3d import axes3d
-import pytraj as pt
 import mdtraj as md
 
 
