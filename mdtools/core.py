@@ -106,7 +106,7 @@ class MyAtom():
             
     @classmethod
     def from_string(cls, string):
-        regex = r"MyAtom\(index=(\d+), name=(\w+), resid=(\d+), resname=(\w+), tube=(\w+), layer=(\w+)\)"
+        regex = r"MyAtom\(index=(\d+), name=(\w+[\+\-]?), resid=(\d+), resname=(\w+[\+\-]?), tube=(\w+), layer=(\w+)\)"
         result = re.search(regex, string)
         myatom = cls.__new__(cls)
         myatom.index = int(result.groups()[0])
